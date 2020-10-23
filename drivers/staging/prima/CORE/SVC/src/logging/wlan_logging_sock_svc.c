@@ -1329,8 +1329,7 @@ static int wlan_logging_thread(void *Arg)
 		}
 	}
 
-	complete(&gwlan_logging.shutdown_comp);
-	do_exit(0);
+	complete_and_exit(&gwlan_logging.shutdown_comp, 0);
 
 	return 0;
 }
@@ -1646,7 +1645,6 @@ int wlan_logging_sock_deactivate_svc(void)
 	gapp_pid = INVALID_PID;
 
 	INIT_COMPLETION(gwlan_logging.shutdown_comp);
-	wmb();
 	gwlan_logging.exit = true;
 	gwlan_logging.is_active = false;
 	vos_set_multicast_logging(0);
@@ -1935,7 +1933,7 @@ void wlan_process_done_indication(uint8 type, uint32 reason_code)
 
 	if ((type == WLAN_FW_LOGS) && reason_code &&
 				 vos_isFatalEventEnabled() &&
-				 vos_is_wlan_logging_enabled())
+				 vos_is_wlan_logging_enabled() && reason_code != 4105)
 	{
 		if(wlan_is_log_report_in_progress() == TRUE)
 		{

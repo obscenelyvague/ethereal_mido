@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1108,14 +1108,6 @@ REG_TABLE_ENTRY g_registry_table[] =
                  CFG_LFR_MAWC_FEATURE_ENABLED_MIN,
                  CFG_LFR_MAWC_FEATURE_ENABLED_MAX,
                  NotifyIsMAWCIniFeatureEnabled, 0 ),
-
-   /* flag to turn ON/OFF Motion assistance for Legacy Fast Roaming */
-   REG_VARIABLE( CFG_PER_BSSID_BLACKLIST_TIMEOUT_NAME, WLAN_PARAM_Integer,
-                 hdd_config_t, bssid_blacklist_timeout,
-                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-                 CFG_PER_BSSID_BLACKLIST_TIMEOUT_DEFAULT,
-                 CFG_PER_BSSID_BLACKLIST_TIMEOUT_MIN,
-                 CFG_PER_BSSID_BLACKLIST_TIMEOUT_MAX ),
 
 #endif // FEATURE_WLAN_LFR
 
@@ -4036,19 +4028,6 @@ REG_VARIABLE( CFG_EXTSCAN_ENABLE, WLAN_PARAM_Integer,
                 CFG_FORCE_RSNE_OVERRIDE_MIN,
                 CFG_FORCE_RSNE_OVERRIDE_MAX),
 
-  REG_VARIABLE_STRING(CFG_ENABLE_DEFAULT_SAP, WLAN_PARAM_String,
-                      hdd_config_t, enabledefaultSAP,
-                      VAR_FLAGS_NONE,
-                      (void *)CFG_ENABLE_DEFAULT_SAP_DEFAULT),
-
-#ifdef WLAN_FEATURE_SAE
-  REG_VARIABLE(CFG_IS_SAE_ENABLED_NAME, WLAN_PARAM_Integer,
-               hdd_config_t, is_sae_enabled,
-               VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-               CFG_IS_SAE_ENABLED_DEFAULT,
-               CFG_IS_SAE_ENABLED_MIN,
-               CFG_IS_SAE_ENABLED_MAX),
-#endif
 };
 
 /*
@@ -4108,8 +4087,8 @@ static char *i_trim(char *str)
 
    /* Find the first non white-space*/
    for (ptr = str; i_isspace(*ptr); ptr++);
-   if (*ptr == '\0')
-      return str;
+      if (*ptr == '\0')
+         return str;
 
    /* This is the new start of the string*/
    str = ptr;
@@ -4117,8 +4096,8 @@ static char *i_trim(char *str)
    /* Find the last non white-space */
    ptr += strlen(ptr) - 1;
    for (; ptr != str && i_isspace(*ptr); ptr--);
-   /* Null terminate the following character */
-   ptr[1] = '\0';
+      /* Null terminate the following character */
+      ptr[1] = '\0';
 
    return str;
 }
@@ -4392,17 +4371,6 @@ config_exit:
    return vos_status;
 }
 
-#ifdef WLAN_FEATURE_SAE
-static void hdd_cfg_print_sae(hdd_context_t *hdd_ctx)
-{
-   hddLog(LOG2, "Name = [%s] value = [%u]", CFG_IS_SAE_ENABLED_NAME,
-          hdd_ctx->cfg_ini->is_sae_enabled);
-}
-#else
-static void hdd_cfg_print_sae(hdd_context_t *hdd_ctx)
-{
-}
-#endif
 
 static void print_hdd_cfg(hdd_context_t *pHddCtx)
 {
@@ -4860,11 +4828,6 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
             "Name = [%s] Value = [%u] ",
             CFG_FORCE_RSNE_OVERRIDE_NAME,
             pHddCtx->cfg_ini->force_rsne_override);
-    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
-            "Name = [%s] Value = [%s] ",
-            CFG_ENABLE_DEFAULT_SAP,
-            pHddCtx->cfg_ini->enabledefaultSAP);
-    hdd_cfg_print_sae(pHddCtx);
 }
 
 
@@ -5776,10 +5739,6 @@ v_BOOL_t hdd_update_config_dat( hdd_context_t *pHddCtx )
 
     if (ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_MCAST_BCAST_FILTER_SETTING, pConfig->mcastBcastFilterSetting,
                      NULL, eANI_BOOLEAN_FALSE)==eHAL_STATUS_FAILURE)
-     {
-        fStatus = FALSE;
-        hddLog(LOGE,"Failure: Could not pass on WNI_CFG_MCAST_BCAST_FILTER_SETTING configuration info to CCM");
-     }
 #endif
 
      if (ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_SINGLE_TID_RC, pConfig->bSingleTidRc,
