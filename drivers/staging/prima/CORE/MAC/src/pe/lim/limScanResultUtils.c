@@ -708,7 +708,7 @@ limLookupNaddHashEntry(tpAniSirGlobal pMac,
     tANI_U8                found = false;
     tLimScanResultNode *ptemp, *pprev;
     tSirMacCapabilityInfo *pSirCap, *pSirCapTemp;
-    int len, elem_id, elem_len;
+    int idx, len;
     tANI_U8 *pbIe;
     tANI_S8  rssi = 0;
 
@@ -756,44 +756,31 @@ limLookupNaddHashEntry(tpAniSirGlobal pMac,
                    rssi = ptemp->bssDescription.rssi;
                 }
 
-                if(pBssDescr->bssDescription.fProbeRsp !=
-                                             ptemp->bssDescription.fProbeRsp)
+                if(pBssDescr->bssDescription.fProbeRsp != ptemp->bssDescription.fProbeRsp)
                 {
                     //We get a different, save the old frame WSC IE if it is there
-                    len = ptemp->bssDescription.length -
-                                 sizeof(tSirBssDescription) +
-                                 sizeof(tANI_U16) + sizeof(tANI_U32);
+                    idx = 0;
+                    len = ptemp->bssDescription.length - sizeof(tSirBssDescription) + 
+                       sizeof(tANI_U16) + sizeof(tANI_U32) - DOT11F_IE_WSCPROBERES_MIN_LEN - 2;
                     pbIe = (tANI_U8 *)ptemp->bssDescription.ieFields;
                     //Save WPS IE if it exists
                     pBssDescr->bssDescription.WscIeLen = 0;
-                    while (len >= 2)
+                    while(idx < len)
                     {
-                        elem_id = pbIe[0];
-                        elem_len = pbIe[1];
-                        len -= 2;
-                        if (elem_len > len) {
-                            limLog(pMac, LOGW, FL("Invalid eid: %d elem_len: %d left: %d"),
-                                   elem_id, elem_len, len);
-                            return eHAL_STATUS_FAILURE;
-                        }
-                        if ((elem_id == DOT11F_EID_WSCPROBERES) &&
-                            (elem_len >= DOT11F_IE_WSCPROBERES_MIN_LEN) &&
-                            ((pbIe[2] == 0x00) && (pbIe[3] == 0x50) &&
-                             (pbIe[4] == 0xf2) &&
-                             (pbIe[5] == 0x04)))
+                        if((DOT11F_EID_WSCPROBERES == pbIe[0]) &&
+                           (0x00 == pbIe[2]) && (0x50 == pbIe[3]) && (0xf2 == pbIe[4]) && (0x04 == pbIe[5]))
                         {
-                            if((elem_len + 2) <= WSCIE_PROBE_RSP_LEN)
+                            //Found it
+                            if((DOT11F_IE_WSCPROBERES_MAX_LEN - 2) >= pbIe[1])
                             {
-                                vos_mem_copy(
-                                        pBssDescr->bssDescription.WscIeProbeRsp,
-                                        pbIe, elem_len + 2);
-                                pBssDescr->bssDescription.WscIeLen =
-                                                          elem_len + 2;
+                                vos_mem_copy(pBssDescr->bssDescription.WscIeProbeRsp,
+                                   pbIe, pbIe[1] + 2);
+                                pBssDescr->bssDescription.WscIeLen = pbIe[1] + 2;
                             }
                             break;
                         }
-                        len -= elem_len;
-                        pbIe += (elem_len + 2);
+                        idx += pbIe[1] + 2;
+                        pbIe += pbIe[1] + 2;
                     }
                 }
                 /*

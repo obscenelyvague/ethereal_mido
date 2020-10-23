@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -381,10 +381,6 @@ eHalStatus csrQueueScanRequest( tpAniSirGlobal pMac, tSmeCmd *pScanCmd )
     /* split scan if any one of the following:
      * - STA session is connected and the scan is not a P2P search
      * - any P2P session is connected
-     * - STA+SAP. In STA+SAP concurrency, scan requests received on
-     *   STA interface when not in connected state are not split.
-     *   This can result in large time gap between successive beacons
-     *   sent by SAP.
      * Do not split scans if no concurrent infra connections are 
      * active and if the scan is a BG scan triggered by LFR (OR)
      * any scan if LFR is in the middle of a BG scan. Splitting
@@ -392,11 +388,7 @@ eHalStatus csrQueueScanRequest( tpAniSirGlobal pMac, tSmeCmd *pScanCmd )
      * candidates and resulting in disconnects.
      */
 
-    if (csrIsInfraApStarted(pMac) && !csrIsP2pGoSessionConnected(pMac))
-    {
-      nNumChanCombinedConc = 1;
-    }
-    else if(csrIsStaSessionConnected(pMac) &&
+    if(csrIsStaSessionConnected(pMac) &&
        !csrIsP2pSessionConnected(pMac))
     {
       nNumChanCombinedConc = pMac->roam.configParam.nNumStaChanCombinedConc;
@@ -3390,44 +3382,38 @@ eHalStatus csrScanningStateMsgProcessor( tpAniSirGlobal pMac, void *pMsgBuf )
     return (status);
 }
 
-void csrCheckNSaveWscIe(tpAniSirGlobal pMac, tSirBssDescription *pNewBssDescr,tSirBssDescription *pOldBssDescr)
+
+
+void csrCheckNSaveWscIe(tpAniSirGlobal pMac, tSirBssDescription *pNewBssDescr, tSirBssDescription *pOldBssDescr)
 {
-    int elem_id, len, elem_len;
+    int idx, len;
     tANI_U8 *pbIe;
 
     //If failed to remove, assuming someone else got it.
     if((pNewBssDescr->fProbeRsp != pOldBssDescr->fProbeRsp) &&
        (0 == pNewBssDescr->WscIeLen))
     {
-        len = GET_IE_LEN_IN_BSS(pOldBssDescr->length);
+        idx = 0;
+        len = GET_IE_LEN_IN_BSS(pOldBssDescr->length)
+              - DOT11F_IE_WSCPROBERES_MIN_LEN - 2;
         pbIe = (tANI_U8 *)pOldBssDescr->ieFields;
         //Save WPS IE if it exists
         pNewBssDescr->WscIeLen = 0;
-        while (len >= 2)
+        while(idx < len)
         {
-            elem_id = pbIe[0];
-            elem_len = pbIe[1];
-            len -= 2;
-            if (elem_len > len) {
-                smsLog(pMac, LOGW, FL("Invalid eid: %d elem_len: %d left: %d"),
-                       elem_id, elem_len, len);
-                return;
-            }
-            if ((elem_id == DOT11F_EID_WSCPROBERES) &&
-                (elem_len >= DOT11F_IE_WSCPROBERES_MIN_LEN) &&
-                ((pbIe[2] == 0x00) && (pbIe[3] == 0x50) && (pbIe[4] == 0xf2) &&
-                (pbIe[5] == 0x04)))
+            if((DOT11F_EID_WSCPROBERES == pbIe[0]) &&
+                (0x00 == pbIe[2]) && (0x50 == pbIe[3]) && (0xf2 == pbIe[4]) && (0x04 == pbIe[5]))
             {
-                if((elem_len + 2) <= WSCIE_PROBE_RSP_LEN)
+                //Founrd it
+                if((DOT11F_IE_WSCPROBERES_MAX_LEN - 2) >= pbIe[1])
                 {
-                    vos_mem_copy(pNewBssDescr->WscIeProbeRsp,
-                                 pbIe, elem_len + 2);
-                    pNewBssDescr->WscIeLen = elem_len + 2;
+                    vos_mem_copy(pNewBssDescr->WscIeProbeRsp, pbIe, pbIe[1] + 2);
+                    pNewBssDescr->WscIeLen = pbIe[1] + 2;
                 }
-                return;
+                break;
             }
-            len -= elem_len;
-            pbIe += (elem_len + 2);
+            idx += pbIe[1] + 2;
+            pbIe += pbIe[1] + 2;
         }
     }
 }
@@ -5875,7 +5861,7 @@ static tANI_BOOLEAN csrScanProcessScanResults( tpAniSirGlobal pMac, tSmeCmd *pCo
         if (eHAL_STATUS_SUCCESS != status)
             smsLog(pMac, LOGE,
                    FL( "failed to update the supported channel list"));
-        pMac->scan.defer_update_channel_list = false;
+            pMac->scan.defer_update_channel_list = false;
     }
 
 #ifdef WLAN_AP_STA_CONCURRENCY
@@ -6452,8 +6438,6 @@ eHalStatus csrSendMBScanReq( tpAniSirGlobal pMac, tANI_U16 sessionId,
                               pScanReq->uIEFieldLen);
             }
             pMsg->p2pSearch = pScanReq->p2pSearch;
-            pMsg->scan_randomize= pScanReq->scan_randomize;
-            pMsg->nl_scan = pScanReq->nl_scan;
 
             if (pScanReq->requestType == eCSR_SCAN_HO_BG_SCAN) 
             {
@@ -6668,11 +6652,6 @@ eHalStatus csrProcessMacAddrSpoofCommand( tpAniSirGlobal pMac, tSmeCmd *pCommand
       // spoof mac address
       vos_mem_copy((tANI_U8 *)pMsg->macAddr,
            (tANI_U8 *)pCommand->u.macAddrSpoofCmd.macAddr, sizeof(tSirMacAddr));
-      vos_mem_copy((tANI_U8 *)pMac->roam.spoof_mac_addr,
-           (tANI_U8 *)pCommand->u.macAddrSpoofCmd.macAddr, sizeof(tSirMacAddr));
-      pMsg->spoof_mac_oui =
-       pal_cpu_to_be16(pCommand->u.macAddrSpoofCmd.spoof_mac_oui);
-
       status = palSendMBMessage(pMac->hHdd, pMsg);
    } while( 0 );
    return( status );
@@ -7152,8 +7131,6 @@ eHalStatus csrScanCopyRequest(tpAniSirGlobal pMac, tCsrScanRequest *pDstReq, tCs
                     break;
                 }
             }//Allocate memory for SSID List
-            pDstReq->scan_randomize = pSrcReq->scan_randomize;
-            pDstReq->nl_scan = pSrcReq->nl_scan;
             pDstReq->p2pSearch = pSrcReq->p2pSearch;
             pDstReq->skipDfsChnlInP2pSearch = pSrcReq->skipDfsChnlInP2pSearch;
 
@@ -7301,10 +7278,6 @@ static void csrStaApConcTimerHandler(void *pv)
          * any one of the following:
          * - STA session is connected and the scan is not a P2P search
          * - any P2P session is connected
-         * - STA+SAP. In STA+SAP concurrency, scan requests received on
-         *   STA interface when not in connected state are not split.
-         *   This can result in large time gap between successive beacons
-         *   sent by SAP.
          * Do not split scans if no concurrent infra connections are 
          * active and if the scan is a BG scan triggered by LFR (OR)
          * any scan if LFR is in the middle of a BG scan. Splitting
@@ -7312,11 +7285,7 @@ static void csrStaApConcTimerHandler(void *pv)
          * candidates and resulting in disconnects.
          */
 
-        if (csrIsInfraApStarted(pMac) && !csrIsP2pGoSessionConnected(pMac))
-        {
-            nNumChanCombinedConc = 1;
-        }
-        else if((csrIsStaSessionConnected(pMac) &&
+        if((csrIsStaSessionConnected(pMac) &&
            !csrIsP2pSessionConnected(pMac)))
         {
            nNumChanCombinedConc = pMac->roam.configParam.nNumStaChanCombinedConc;

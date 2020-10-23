@@ -134,8 +134,6 @@
 #define FW_STATE_WAIT_TIME 500
 #define FW_STATE_RSP_LEN 100
 
-#define WLAN_WAIT_TIME_FEATURE_CAPS 300
-
 /* Amount of time to wait for sme close session callback.
    This value should be larger than the timeout used by WDI to wait for
    a response from WCNSS */
@@ -863,7 +861,6 @@ typedef struct hdd_hostapd_state_s
     int bssState;
     vos_event_t vosEvent;
     VOS_STATUS vosStatus;
-    vos_event_t sta_discon_event;
     v_BOOL_t bCommit; 
 
 } hdd_hostapd_state_t;
