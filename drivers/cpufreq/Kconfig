@@ -263,6 +263,22 @@ config CPU_BOOST
 
 	  If in doubt, say N.
 
+if CPU_BOOST
+
+config CPU_BOOST_INPUT_BOOST_DURATION_MS
+	int "Input boost duration"
+	default "64"
+	help
+	  Input boost duration in milliseconds.
+
+config CPU_BOOST_INPUT_BOOST_FREQ
+	int "input boost freq"
+	default "0"
+	help
+	  Input boost frequency for the CPU.
+
+endif
+
 menu "x86 CPU frequency scaling drivers"
 depends on X86
 source "drivers/cpufreq/Kconfig.x86"
