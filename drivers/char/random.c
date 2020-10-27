@@ -702,18 +702,15 @@ retry:
 	}
 }
 
-static int credit_entropy_bits_safe(struct entropy_store *r, int nbits)
+static void credit_entropy_bits_safe(struct entropy_store *r, int nbits)
 {
 	const int nbits_max = r->poolinfo->poolwords * 32;
 
-	if (nbits < 0)
-		return -EINVAL;
-
 	/* Cap the value to avoid overflows */
 	nbits = min(nbits,  nbits_max);
+	nbits = max(nbits, -nbits_max);
 
 	credit_entropy_bits(r, nbits);
-	return 0;
 }
 
 /*********************************************************************
@@ -1462,7 +1459,8 @@ static long random_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 			return -EPERM;
 		if (get_user(ent_count, p))
 			return -EFAULT;
-		return credit_entropy_bits_safe(&input_pool, ent_count);
+		credit_entropy_bits_safe(&input_pool, ent_count);
+		return 0;
 	case RNDADDENTROPY:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
@@ -1476,7 +1474,8 @@ static long random_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 				    size);
 		if (retval < 0)
 			return retval;
-		return credit_entropy_bits_safe(&input_pool, ent_count);
+		credit_entropy_bits_safe(&input_pool, ent_count);
+		return 0;
 	case RNDZAPENTCNT:
 	case RNDCLEARPOOL:
 		/*
