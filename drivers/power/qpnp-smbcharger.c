@@ -2601,6 +2601,7 @@ static void smbchg_parallel_usb_en_work(struct work_struct *work)
 	return;
 
 recheck:
+chip->parallel.parallel_en_in_progress = false;
 	queue_delayed_work(system_power_efficient_wq,
 		&chip->parallel_en_work, 0);
 }
