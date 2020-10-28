@@ -46,7 +46,7 @@
 #include "msm8x16_wcd_registers.h"
 
 #define MSM8X16_WCD_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
-			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000)
+			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000)
 #define MSM8X16_WCD_FORMATS (SNDRV_PCM_FMTBIT_S16_LE |\
 		SNDRV_PCM_FMTBIT_S24_LE |\
 		SNDRV_PCM_FMTBIT_S24_3LE |\
@@ -2091,7 +2091,7 @@ static int msm8x16_wcd_hph_mode_get(struct snd_kcontrol *kcontrol,
 	struct msm8x16_wcd_priv *msm8x16_wcd = snd_soc_codec_get_drvdata(codec);
 
 	if (msm8x16_wcd->hph_mode == NORMAL_MODE) {
-		ucontrol->value.integer.value[0] = 0;
+		ucontrol->value.integer.value[0] = 1;
 	} else if (msm8x16_wcd->hph_mode == HD2_MODE) {
 		ucontrol->value.integer.value[0] = 1;
 	} else  {
@@ -2115,14 +2115,14 @@ static int msm8x16_wcd_hph_mode_set(struct snd_kcontrol *kcontrol,
 
 	switch (ucontrol->value.integer.value[0]) {
 	case 0:
-		msm8x16_wcd->hph_mode = NORMAL_MODE;
+		msm8x16_wcd->hph_mode = HD2_MODE;
 		break;
 	case 1:
 		if (get_codec_version(msm8x16_wcd) >= DIANGU)
 			msm8x16_wcd->hph_mode = HD2_MODE;
 		break;
 	default:
-		msm8x16_wcd->hph_mode = NORMAL_MODE;
+		msm8x16_wcd->hph_mode = HD2_MODE;
 		break;
 	}
 	dev_dbg(codec->dev, "%s: msm8x16_wcd->hph_mode_set = %d\n",
@@ -4890,7 +4890,7 @@ static struct snd_soc_dai_driver msm8x16_wcd_i2s_dai[] = {
 			.stream_name = "VIfeed",
 			.rates = MSM8X16_WCD_RATES,
 			.formats = MSM8X16_WCD_FORMATS,
-			.rate_max = 48000,
+			.rate_max = 96000,
 			.rate_min = 48000,
 			.channels_min = 2,
 			.channels_max = 2,
@@ -5556,7 +5556,7 @@ static int msm8x16_wcd_device_down(struct snd_soc_codec *codec)
 		}
 	}
 	msm8x16_wcd_boost_off(codec);
-	msm8x16_wcd_priv->hph_mode = NORMAL_MODE;
+	msm8x16_wcd_priv->hph_mode = HD2_MODE;
 	for (i = 0; i < MSM8X16_WCD_RX_MAX; i++)
 		msm8x16_wcd_priv->comp_enabled[i] = COMPANDER_NONE;
 
@@ -5766,16 +5766,8 @@ static void msm8x16_wcd_configure_cap(struct snd_soc_codec *codec,
 }
 
 #ifdef CONFIG_SOUND_CONTROL
-static struct snd_soc_codec *sound_control_codec_ptr;
 
-static ssize_t headphone_gain_show(struct kobject *kobj,
-		struct kobj_attribute *attr, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%d %d\n",
-		snd_soc_read(sound_control_codec_ptr, MSM8X16_WCD_A_CDC_RX1_VOL_CTL_B2_CTL),
-		snd_soc_read(sound_control_codec_ptr, MSM8X16_WCD_A_CDC_RX2_VOL_CTL_B2_CTL)
-	);
-}
+static struct snd_soc_codec *sound_control_codec_ptr;
 
 static ssize_t headphone_gain_store(struct kobject *kobj,
 		struct kobj_attribute *attr, const char *buf, size_t count)
@@ -5786,15 +5778,24 @@ static ssize_t headphone_gain_store(struct kobject *kobj,
 	sscanf(buf, "%d %d", &input_l, &input_r);
 
 	if (input_l < -84 || input_l > 20)
-		input_l = 0;
+		input_l = 2;
 
 	if (input_r < -84 || input_r > 20)
-		input_r = 0;
+		input_r = 2;
 
 	snd_soc_write(sound_control_codec_ptr, MSM8X16_WCD_A_CDC_RX1_VOL_CTL_B2_CTL, input_l);
 	snd_soc_write(sound_control_codec_ptr, MSM8X16_WCD_A_CDC_RX2_VOL_CTL_B2_CTL, input_r);
 
 	return count;
+}
+
+static ssize_t headphone_gain_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d %d\n",
+		snd_soc_read(sound_control_codec_ptr, MSM8X16_WCD_A_CDC_RX1_VOL_CTL_B2_CTL),
+		snd_soc_read(sound_control_codec_ptr, MSM8X16_WCD_A_CDC_RX2_VOL_CTL_B2_CTL)
+	);
 }
 
 static struct kobj_attribute headphone_gain_attribute =
@@ -5806,7 +5807,7 @@ static ssize_t mic_gain_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
 	return snprintf(buf, PAGE_SIZE, "%d\n",
-		snd_soc_read(sound_control_codec_ptr, MSM8X16_WCD_A_CDC_TX1_VOL_CTL_GAIN));
+		snd_soc_read(sound_control_codec_ptr, MSM8X16_WCD_A_CDC_TX1_VOL_CTL_GAIN)); //Read gain just on DEC1, will be the same of DEC2.
 }
 
 static ssize_t mic_gain_store(struct kobject *kobj,
@@ -5819,7 +5820,8 @@ static ssize_t mic_gain_store(struct kobject *kobj,
 	if (input < -10 || input > 20)
 		input = 0;
 
-	snd_soc_write(sound_control_codec_ptr, MSM8X16_WCD_A_CDC_TX1_VOL_CTL_GAIN, input);
+	snd_soc_write(sound_control_codec_ptr, MSM8X16_WCD_A_CDC_TX1_VOL_CTL_GAIN, input); //Write single gain on DEC1
+	snd_soc_write(sound_control_codec_ptr, MSM8X16_WCD_A_CDC_TX2_VOL_CTL_GAIN, input); //Write single gain on DEC2
 
 	return count;
 }
@@ -5946,7 +5948,7 @@ static int msm8x16_wcd_codec_probe(struct snd_soc_codec *codec)
 	 * it to BOOST_ALWAYS or BOOST_BYPASS based on solution chosen.
 	 */
 	msm8x16_wcd_priv->boost_option = BOOST_SWITCH;
-	msm8x16_wcd_priv->hph_mode = NORMAL_MODE;
+	msm8x16_wcd_priv->hph_mode = HD2_MODE;
 
 	for (i = 0; i < MSM8X16_WCD_RX_MAX; i++)
 		msm8x16_wcd_priv->comp_enabled[i] = COMPANDER_NONE;
