@@ -45,6 +45,7 @@
 #include <linux/fb.h>
 #include <linux/pm_qos.h>
 #include <linux/cpufreq.h>
+#include <linux/display_state.h>
 
 #include "gf_spi.h"
 
@@ -414,8 +415,10 @@ static irqreturn_t gf_irq(int irq, void *handle)
 	char temp = GF_NET_EVENT_IRQ;
 	gf_dbg("enter irq %s\n", __func__);
 
-	wake_lock_timeout(&gf_dev->ttw_wl, msecs_to_jiffies(1000));
-
+	if (!is_display_on()){
+	wake_lock_timeout(&gf_dev->ttw_wl,
+				msecs_to_jiffies(1000));
+	}
 	sendnlmsg(&temp);
 #elif defined (GF_FASYNC)
 
