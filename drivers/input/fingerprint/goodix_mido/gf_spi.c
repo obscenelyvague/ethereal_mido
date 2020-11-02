@@ -46,6 +46,7 @@
 #include <linux/pm_qos.h>
 #include <linux/cpufreq.h>
 #include <linux/display_state.h>
+#include <linux/cpu_input_boost.h>
 
 #include "gf_spi.h"
 
@@ -416,6 +417,7 @@ static irqreturn_t gf_irq(int irq, void *handle)
 	gf_dbg("enter irq %s\n", __func__);
 
 	if (!is_display_on()){
+	cpu_input_boost_kick_max(1000);
 	wake_lock_timeout(&gf_dev->ttw_wl,
 				msecs_to_jiffies(1000));
 	}
