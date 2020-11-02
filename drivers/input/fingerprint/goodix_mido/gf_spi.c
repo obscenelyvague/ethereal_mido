@@ -571,11 +571,31 @@ static const struct file_operations gf_fops = {
 #endif
 };
 
+static void set_gx_fpd_nice(int nice)
+{
+	struct task_struct *p;
+
+	rcu_read_lock();
+	for_each_process(p) {
+		if (!memcmp(p->comm, "gx_fpd", 7)) {
+			set_user_nice(p, nice);
+			break;
+		}
+	}
+	rcu_read_unlock();
+}
+
 static void fb_state_worker(struct work_struct *work)
 {
 	struct gf_dev *gf_dev = container_of(work, typeof(*gf_dev), fb_work);
 	if (!gf_dev->device_available)
 		return;
+
+	if (is_display_on())
+		set_gx_fpd_nice(0);
+	else
+		set_gx_fpd_nice(MIN_NICE);
+
  #if defined(GF_NETLINK_ENABLE)
 	{
 		char temp = gf_dev->fb_black ?
