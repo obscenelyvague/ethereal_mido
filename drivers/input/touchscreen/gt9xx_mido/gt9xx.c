@@ -3002,6 +3002,19 @@ static void goodix_ts_resume(struct goodix_ts_data *ts)
 
 
 #if   defined(CONFIG_FB)
+
+static bool screen_off;
+
+static void touch_pm_worker(struct work_struct *work)
+{
+	struct goodix_ts_data *ts = container_of(work, struct goodix_ts_data, pm_work);
+
+	if (screen_off)
+		goodix_ts_suspend(ts);
+	else
+		goodix_ts_resume(ts);
+}
+
 /* frame buffer notifier block control the suspend/resume procedure */
 static int gtp_fb_notifier_callback(struct notifier_block *noti, unsigned long event, void *data)
 {
@@ -3011,14 +3024,9 @@ static int gtp_fb_notifier_callback(struct notifier_block *noti, unsigned long e
 
 	if (ev_data && ev_data->data && event == FB_EVENT_BLANK && ts) {
 		blank = ev_data->data;
-		if (*blank == FB_BLANK_UNBLANK) {
-			GTP_DEBUG("Resume by fb notifier.");
-			goodix_ts_resume(ts);
-
-		} else if (*blank == FB_BLANK_POWERDOWN) {
-			GTP_DEBUG("Suspend by fb notifier.");
-			goodix_ts_suspend(ts);
-		}
+		cancel_work_sync(&ts->pm_work);
+		screen_off = *blank != FB_BLANK_UNBLANK;
+		schedule_work(&ts->pm_work);
 	}
 
 	return 0;
@@ -3080,6 +3088,7 @@ static void gtp_early_resume(struct early_suspend *h)
 static int gtp_register_powermanger(struct goodix_ts_data *ts)
 {
 #if   defined(CONFIG_FB)
+	INIT_WORK(&ts->pm_work, touch_pm_worker);
 	ts->notifier.notifier_call = gtp_fb_notifier_callback;
 	fb_register_client(&ts->notifier);
 
