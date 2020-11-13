@@ -327,7 +327,9 @@ u8 cover_on;
 struct work_struct work_vr;
 u8 vr_on;
 #endif
+struct work_struct pm_work;
 };
+static bool screen_off;
 static bool disable_keys_function = false;
 bool is_ft5435 = false;
 struct wake_lock ft5436_wakelock;
@@ -1579,6 +1581,16 @@ static int ft5435_ts_resume(struct device *dev)
 
 #if 1
 #if defined(CONFIG_FB)
+static void touch_pm_worker(struct work_struct *work)
+{
+struct ft5435_ts_data *ft5435_data =
+                container_of(work, struct ft5435_ts_data, pm_work);
+
+	if (screen_off)
+		ft5435_ts_suspend(&ft5435_data->client->dev);
+else
+		ft5435_ts_resume(&ft5435_data->client->dev);
+}
 static int fb_notifier_callback(struct notifier_block *self,
 				 unsigned long event, void *data)
 {
@@ -1590,10 +1602,9 @@ static int fb_notifier_callback(struct notifier_block *self,
 	if (evdata && evdata->data && event == FB_EVENT_BLANK &&
 			ft5435_data && ft5435_data->client) {
 		blank = evdata->data;
-		if (*blank == FB_BLANK_UNBLANK)
-			ft5435_ts_resume(&ft5435_data->client->dev);
-		else if (*blank == FB_BLANK_POWERDOWN)
-			ft5435_ts_suspend(&ft5435_data->client->dev);
+		cancel_work_sync(&ft5435_data->pm_work);
+		screen_off = *blank != FB_BLANK_UNBLANK;
+		schedule_work(&ft5435_data->pm_work);
 	}
 	return 0;
 }
@@ -4151,6 +4162,7 @@ INIT_WORK(&data->work_vr, ft5435_change_vr_switch);
 
 #if defined(CONFIG_FB)
 
+        INIT_WORK(&data->pm_work, touch_pm_worker);
 	data->fb_notif.notifier_call = fb_notifier_callback;
 
 	err = fb_register_client(&data->fb_notif);
