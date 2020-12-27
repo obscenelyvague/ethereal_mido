@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -582,7 +582,7 @@ void __hdd_processSpoofMacAddrRequest(struct work_struct *work)
         hddLog(LOG1, FL("Processing Spoof request now"));
         /* Inform SME about spoof mac addr request*/
         if ( eHAL_STATUS_SUCCESS != sme_SpoofMacAddrReq(pHddCtx->hHal,
-                &pHddCtx->spoofMacAddr.randomMacAddr))
+                &pHddCtx->spoofMacAddr.randomMacAddr, true))
         {
             hddLog(LOGE, FL("Sending Spoof request failed - Disable spoofing"));
             pHddCtx->spoofMacAddr.isEnabled = FALSE;
@@ -839,7 +839,8 @@ int __iw_set_scan(struct net_device *dev, struct iw_request_info *info,
    }
 
    /* push addIEScan in scanRequset if exist */
-   if (pHddCtx->scan_info.scanAddIE.length)
+   if (pHddCtx->scan_info.scanAddIE.addIEdata != NULL && 
+       pHddCtx->scan_info.scanAddIE.length)
    { 
        scanRequest.uIEFieldLen = pHddCtx->scan_info.scanAddIE.length;
        scanRequest.pIEField = pHddCtx->scan_info.scanAddIE.addIEdata;
@@ -1286,7 +1287,8 @@ int iw_set_cscan(struct net_device *dev, struct iw_request_info *info,
         }
 
         /* push addIEScan in scanRequset if exist */
-        if (pHddCtx->scan_info.scanAddIE.length)
+        if (pHddCtx->scan_info.scanAddIE.addIEdata != NULL && 
+            pHddCtx->scan_info.scanAddIE.length)
         {
             scanRequest.uIEFieldLen = pHddCtx->scan_info.scanAddIE.length;
             scanRequest.pIEField = pHddCtx->scan_info.scanAddIE.addIEdata;

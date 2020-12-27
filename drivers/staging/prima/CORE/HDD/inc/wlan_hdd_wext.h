@@ -176,7 +176,7 @@ typedef enum
 #define IE_VENDOR_OUI_SIZE   4
 
 /** Maximum Length of WPA/RSN IE */
-#define MAX_WPA_RSN_IE_LEN 40
+#define MAX_WPA_RSN_IE_LEN 255
 
 /** Maximum Number of WEP KEYS */
 #define MAX_WEP_KEYS 4
@@ -401,10 +401,6 @@ extern int iw_set_auth(struct net_device *dev,struct iw_request_info *info,
 
 extern int iw_get_auth(struct net_device *dev,struct iw_request_info *info,
                        union iwreq_data *wrqu,char *extra);
-
-VOS_STATUS iw_set_pno(struct net_device *dev, struct iw_request_info *info,
-                      union iwreq_data *wrqu, char *extra, int nOffset);
-
 
 VOS_STATUS iw_set_rssi_filter(struct net_device *dev, struct iw_request_info *info,
                               union iwreq_data *wrqu, char *extra, int nOffset);

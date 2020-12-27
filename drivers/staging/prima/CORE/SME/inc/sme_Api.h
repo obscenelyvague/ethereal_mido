@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -233,6 +233,7 @@ sme_SetLinkLayerStatsIndCB
 
 void sme_set_vowifi_mode(tpAniSirGlobal pMac, bool enable);
 void sme_set_qpower(tpAniSirGlobal pMac, uint8_t enable);
+void sme_set_olpc_mode(tpAniSirGlobal pMac, bool enable);
 
 #ifdef WLAN_FEATURE_EXTSCAN
 /* ---------------------------------------------------------------------------
@@ -324,13 +325,16 @@ eHalStatus sme_OemDataRegisterCallback (tHalHandle hHal,
                void *callbackContext);
 #endif
 
-/* ---------------------------------------------------------------------------
-    \fn sme_SpoofMacAddrReq
-    \brief  SME API to send Spoof Mac Addr req to HAL
-    \param  macaddr: mac address to be sent
-    \- return eHalStatus
-    -------------------------------------------------------------------------*/
-eHalStatus  sme_SpoofMacAddrReq(tHalHandle hHal, v_MACADDR_t *macaddr);
+/**
+ * sme_SpoofMacAddrReq() - SME API to send Spoof Mac Addr req to HAL
+ * @hHal: Hal handle
+ * @macaddr: Spoof mac address to be sent
+ * @spoof_mac_oui: If spoof request is from VENDOR_SUBCMD_MAC_OUI
+ *
+ * Return: eHalStatus
+ */
+eHalStatus
+sme_SpoofMacAddrReq(tHalHandle hHal, v_MACADDR_t *macaddr, bool spoof_mac_oui);
 
 typedef enum
 {
@@ -2805,17 +2809,17 @@ eHalStatus sme_HideSSID(tHalHandle hHal, v_U8_t sessionId, v_U8_t ssidHidden);
   ---------------------------------------------------------------------------*/
 eHalStatus sme_SetTmLevel(tHalHandle hHal, v_U16_t newTMLevel, v_U16_t tmMode);
 
-/*---------------------------------------------------------------------------
-
-  \brief sme_featureCapsExchange() - SME interface to exchange capabilities between
-  Host and FW.
-
-  \param  hHal - HAL handle for device
-
-  \return NONE
-
----------------------------------------------------------------------------*/
-void sme_featureCapsExchange(tHalHandle hHal);
+/**
+ * sme_featureCapsExchange() - SME API to get firmware feature caps
+ * @params: Pointer to hold HDD callback to be invoked for response
+ * and associated user data.
+ *
+ * This function is used to exchange capabilities between Host and FW.
+ *
+ * Return: VOS_STATUS
+ */
+VOS_STATUS
+sme_featureCapsExchange(struct sir_feature_caps_params *params);
 
 /*---------------------------------------------------------------------------
 
@@ -3728,9 +3732,9 @@ eHalStatus smeIssueFastRoamNeighborAPEvent (tHalHandle hHal,
 
 eHalStatus sme_RoamDelPMKIDfromCache( tHalHandle hHal, tANI_U8 sessionId,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0))
-                                      const tANI_U8 *pBSSId,
+                                      tPmkidCacheInfo *pmksa,
 #else
-                                      tANI_U8 *pBSSId,
+                                      tPmkidCacheInfo *pmksa,
 #endif
                                       tANI_BOOLEAN flush_cache );
 
@@ -4109,4 +4113,96 @@ bool sme_is_sta_key_exchange_in_progress(tHalHandle hal, uint8_t session_id);
  */
 VOS_STATUS sme_process_msg_callback(tHalHandle hal, vos_msg_t *msg);
 
+/**
+ * sme_send_mgmt_tx() - Sends mgmt frame from CSR to LIM
+ * @hal: The handle returned by mac_open
+ * @session_id: session id
+ * @buf: pointer to frame
+ * @len: frame length
+ *
+ * Return: eHalStatus
+ */
+eHalStatus sme_send_mgmt_tx(tHalHandle hal, uint8_t session_id,
+                                const uint8_t *buf, uint32_t len);
+
+#ifdef WLAN_FEATURE_SAE
+/**
+ * sme_handle_sae_msg() - Sends SAE message received from supplicant
+ * @hal: The handle returned by mac_open
+ * @session_id: session id
+ * @sae_status: status of SAE authentication
+ * @peer_mac_addr: mac address of the peer to be authenticated
+ *
+ * Return: HAL_STATUS
+ */
+eHalStatus sme_handle_sae_msg(tHalHandle hal, uint8_t session_id,
+                            uint8_t sae_status,
+                            tSirMacAddr peer_mac_addr);
+#else
+static inline eHalStatus sme_handle_sae_msg(tHalHandle hal, uint8_t session_id,
+                                            uint8_t sae_status,
+                                            tSirMacAddr peer_mac_addr)
+{
+	return eHAL_STATUS_SUCCESS;
+}
+#endif
+
+#define MAX_BSSID_AVOID_LIST 16
+
+struct roam_ext_params {
+    uint8_t blacklist_timedout;
+    uint8_t num_bssid_avoid_list;
+    v_MACADDR_t bssid_avoid_list[MAX_BSSID_AVOID_LIST];
+};
+
+/**
+ * sme_UpdateBlacklist() - Send blacklist bssid received from user space
+ * @hal: The handle returned by mac_open
+ * @session_id: session id
+ * @roam_ext_params: list of blacklist Bssid
+ *
+ * Return: HAL_STATUS
+ */
+eHalStatus sme_UpdateBlacklist(tHalHandle hHal, uint8_t session_id,
+                               struct roam_ext_params *roam_params);
+
+/**
+ * sme_update_olpc_mode() - Send OLPC mode command received from user space
+ * @hal: The handle returned by mac_open
+ * @enable: OLPC mode enable/disable
+ *
+ * Return: HAL_STATUS
+ */
+eHalStatus sme_update_olpc_mode(tHalHandle hHal, bool enable);
+
+#ifdef FEATURE_WLAN_SW_PTA
+/**
+ * sme_sw_pta_req() - Send sw pta coex params request to sme
+ * @hal: The handle returned by mac_open
+ * @resp_callback: callback to indicate sw pta response to hdd
+ * @session_id: session id
+ * @type: sw pta coex param type
+ * @length: length of sw pta coex param value
+ * @value: sw pta coex params value
+ *
+ * Return: HAL_STATUS
+ */
+eHalStatus sme_sw_pta_req(tHalHandle hal,
+			  void (*resp_callback)(uint8_t resp_status),
+			  uint8_t session_id, enum sir_sw_pta_param_type type,
+			  uint8_t length, uint8_t *value);
+
+/**
+ * sme_sco_req() - Send sco request status to sme
+ * @hal: The handle returned by mac_open
+ * @resp_callback: callback to indicate sco response to hdd
+ * @session_id: session id
+ * @req_status: sco request status
+ *
+ * Return: HAL_STATUS
+ */
+eHalStatus sme_sco_req(tHalHandle hal,
+		       void (*resp_callback)(uint8_t resp_status),
+		       uint8_t session_id, uint8_t req_status);
+#endif /* FEATURE_WLAN_SW_PTA */
 #endif //#if !defined( __SME_API_H )

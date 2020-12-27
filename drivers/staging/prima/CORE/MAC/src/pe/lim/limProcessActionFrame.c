@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2019-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -71,7 +71,7 @@
 #ifdef WLAN_FEATURE_LFR_MBB
 #include "lim_mbb.h"
 #endif
-
+#include "dot11f.h"
 
 #define BA_DEFAULT_TX_BUFFER_SIZE 64
 
@@ -1005,7 +1005,8 @@ __limProcessQosMapConfigureFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,
      }
      limSendSmeMgmtFrameInd(pMac, psessionEntry->smeSessionId,
                                         pRxPacketInfo, psessionEntry,
-                                        WDA_GET_RX_RSSI_DB(pRxPacketInfo));
+                                        WDA_GET_RX_RSSI_DB(pRxPacketInfo),
+                                        RXMGMT_FLAG_NONE);
 }
 
 #ifdef ANI_SUPPORT_11H
@@ -1385,7 +1386,8 @@ __limProcessAddBAReq( tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
 
     psessionEntry->amsduSupportedInBA = frmAddBAReq.AddBAParameterSet.amsduSupported;
 
-    pSta = dphLookupHashEntry( pMac, pHdr->sa, &aid, &psessionEntry->dph.dphHashTable );
+    pSta = dphLookupHashEntry(pMac, pHdr->sa, &aid,
+                              &psessionEntry->dph.dphHashTable);
     if( pSta == NULL )
     {
         limLog( pMac, LOGE,
@@ -1662,9 +1664,9 @@ tANI_U8 *pBody;
     else
         frmAddBARsp.AddBAParameterSet.bufferSize =
                     VOS_MIN(val, frmAddBARsp.AddBAParameterSet.bufferSize);
-        limLog( pMac, LOG1,
-            FL( "ADDBA RSP  Buffsize = %d" ),
-            frmAddBARsp.AddBAParameterSet.bufferSize);
+    limLog( pMac, LOG1,
+        FL( "ADDBA RSP  Buffsize = %d" ),
+        frmAddBARsp.AddBAParameterSet.bufferSize);
     // Now, validate the ADDBA Rsp
     if( eSIR_MAC_SUCCESS_STATUS !=
         __limValidateAddBAParameterSet( pMac, pSta,
@@ -2184,6 +2186,7 @@ static void __limProcessSAQueryRequestActionFrame(tpAniSirGlobal pMac, tANI_U8 *
     tpSirMacMgmtHdr     pHdr;
     tANI_U8             *pBody;
     tANI_U8             transId[2];
+    uint32_t            frame_len;
 
     /* Prima  --- Below Macro not available in prima 
        pHdr = SIR_MAC_BD_TO_MPDUHEADER(pBd);
@@ -2191,7 +2194,13 @@ static void __limProcessSAQueryRequestActionFrame(tpAniSirGlobal pMac, tANI_U8 *
 
     pHdr = WDA_GET_RX_MAC_HEADER(pRxPacketInfo);
     pBody = WDA_GET_RX_MPDU_DATA(pRxPacketInfo);
+    frame_len = WDA_GET_RX_PAYLOAD_LEN(pRxPacketInfo);
 
+    if (frame_len < sizeof(struct sDot11fSaQueryReq)) {
+         VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
+                   ("Invalid frame length"));
+         return;
+    }
     /* If this is an unprotected SA Query Request, then ignore it. */
     if (pHdr->fc.wep == 0)
         return;
@@ -2240,19 +2249,27 @@ static void __limProcessSAQueryResponseActionFrame(tpAniSirGlobal pMac, tANI_U8 
     tANI_U16            aid;
     tANI_U16            transId;
     tANI_U8             retryNum;
+    uint32_t            frame_len;
 
     pHdr = WDA_GET_RX_MAC_HEADER(pRxPacketInfo);
     pBody = WDA_GET_RX_MPDU_DATA(pRxPacketInfo);
+    frame_len = WDA_GET_RX_PAYLOAD_LEN(pRxPacketInfo);
     VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
                          ("SA Query Response received...")) ;
 
+    if (frame_len < sizeof(struct sDot11fSaQueryRsp)) {
+        VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
+                  ("Invalid frame length"));
+        return;
+    }
     /* When a station, supplicant handles SA Query Response.
        Forward to SME to HDD to wpa_supplicant. */
     if (eLIM_STA_ROLE == psessionEntry->limSystemRole)
     {
         limSendSmeMgmtFrameInd(pMac, psessionEntry->smeSessionId,
                                     pRxPacketInfo, psessionEntry,
-                                    WDA_GET_RX_RSSI_DB(pRxPacketInfo));
+                                    WDA_GET_RX_RSSI_DB(pRxPacketInfo),
+                                    RXMGMT_FLAG_NONE);
         return;
     }
 
@@ -2552,7 +2569,7 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                /* Forward to the SME to HDD to wpa_supplicant */
                limSendSmeMgmtFrameInd(pMac, psessionEntry->smeSessionId,
                                        pRxPacketInfo,
-                                       psessionEntry, rssi);
+                                       psessionEntry, rssi, RXMGMT_FLAG_NONE);
                break;
             }
         }
@@ -2617,7 +2634,7 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                  // type is ACTION
                   limSendSmeMgmtFrameInd(pMac, psessionEntry->smeSessionId,
                                          pRxPacketInfo,
-                                         psessionEntry, 0);
+                                         psessionEntry, 0, RXMGMT_FLAG_NONE);
               }
 #if defined (WLAN_FEATURE_RMC)
               else if ((eLIM_STA_IN_IBSS_ROLE == psessionEntry->limSystemRole) &&
@@ -2706,7 +2723,8 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                  limSendSmeMgmtFrameInd(pMac, psessionEntry->smeSessionId,
                                         pRxPacketInfo,
                                         psessionEntry,
-                                        WDA_GET_RX_RSSI_DB(pRxPacketInfo));
+                                        WDA_GET_RX_RSSI_DB(pRxPacketInfo),
+                                        RXMGMT_FLAG_NONE);
               }
               else
               {
@@ -2742,7 +2760,7 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                                     ("Public Action TDLS Discovery RSP ..")) ;
                limSendSmeMgmtFrameInd(pMac, psessionEntry->smeSessionId,
                                       pRxPacketInfo,
-                                      psessionEntry, rssi);
+                                      psessionEntry, rssi, RXMGMT_FLAG_NONE);
            }
                break;
 #endif
@@ -2855,7 +2873,8 @@ limProcessActionFrameNoSession(tpAniSirGlobal pMac, tANI_U8 *pBd)
                   /* Forward to the SME to HDD to wpa_supplicant */
                   // type is ACTION
                   limSendSmeMgmtFrameInd(pMac, 0, pBd, NULL,
-                                         WDA_GET_RX_RSSI_DB(pBd));
+                                         WDA_GET_RX_RSSI_DB(pBd),
+                                         RXMGMT_FLAG_NONE);
                 }
                 else
                 {
