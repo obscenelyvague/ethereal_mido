@@ -933,6 +933,9 @@ static eHalStatus hdd_wmm_sme_callback (tHalHandle hHal,
          hdd_wmm_notify_app(pQosContext);
       }
 
+#ifdef FEATURE_WLAN_ESE
+      hdd_wmm_disable_inactivity_timer(pQosContext);
+#endif
       /* Setting up QoS Failed, QoS context can be released.
        * SME is releasing this flow information and if HDD doen't release this context,
        * next time if application uses the same handle to set-up QoS, HDD (as it has
@@ -1170,6 +1173,9 @@ static eHalStatus hdd_wmm_sme_callback (tHalHandle hHal,
          hdd_wmm_notify_app(pQosContext);
       }
 
+#ifdef FEATURE_WLAN_ESE
+      hdd_wmm_disable_inactivity_timer(pQosContext);
+#endif
       // we are done with this flow
       hdd_wmm_free_context(pQosContext);
       break;
@@ -1221,6 +1227,9 @@ static eHalStatus hdd_wmm_sme_callback (tHalHandle hHal,
          hdd_wmm_notify_app(pQosContext);
       }
 
+#ifdef FEATURE_WLAN_ESE
+      hdd_wmm_disable_inactivity_timer(pQosContext);
+#endif
       // we are done with this flow
       hdd_wmm_free_context(pQosContext);
       break;
