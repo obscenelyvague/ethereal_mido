@@ -1647,10 +1647,6 @@ asmlinkage int vprintk_emit(int facility, int level,
 			    const char *dict, size_t dictlen,
 			    const char *fmt, va_list args)
 {
-	/* return instantly if printk is disabled */
-	if (likely(printk_mode == 0))
-		return 0;
-
 	static int recursion_bug;
 	static char textbuf[LOG_LINE_MAX];
 	char *text = textbuf;
@@ -1662,6 +1658,10 @@ asmlinkage int vprintk_emit(int facility, int level,
 	bool in_sched = false;
 	/* cpu currently holding logbuf_lock in this function */
 	static volatile unsigned int logbuf_cpu = UINT_MAX;
+
+	/* return instantly if printk is disabled */
+	if (likely(printk_mode == 0))
+		return 0;
 
 	if (level == SCHED_MESSAGE_LOGLEVEL) {
 		level = -1;
@@ -1838,12 +1838,12 @@ asmlinkage int printk_emit(int facility, int level,
 			   const char *dict, size_t dictlen,
 			   const char *fmt, ...)
 {
+	va_list args;
+	int r;
+
 	/* return instantly if printk is disabled */
 	if (likely(printk_mode == 0))
 		return 0;
-
-	va_list args;
-	int r;
 
 	va_start(args, fmt);
 	r = vprintk_emit(facility, level, dict, dictlen, fmt, args);
