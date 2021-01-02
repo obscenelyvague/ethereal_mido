@@ -249,7 +249,7 @@ static int msm_cpufreq_suspend(void)
 static int msm_cpufreq_resume(void)
 {
 	int cpu;
-#ifndef CONFIG_CPU_BOOST
+#if !defined(CONFIG_CPU_BOOST) || !defined(CONFIG_CPU_INPUT_BOOST)
 	int ret;
 	struct cpufreq_policy policy;
 #endif
@@ -258,7 +258,7 @@ static int msm_cpufreq_resume(void)
 		per_cpu(suspend_data, cpu).device_suspended = 0;
 	}
 
-#ifndef CONFIG_CPU_BOOST
+#if !defined(CONFIG_CPU_BOOST) || !defined(CONFIG_CPU_INPUT_BOOST)
 	/*
 	 * Freq request might be rejected during suspend, resulting
 	 * in policy->cur violating min/max constraint.
